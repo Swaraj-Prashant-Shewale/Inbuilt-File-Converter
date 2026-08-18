@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Generated at install time by register.py
+quickconvert.ico
+
+# Local-only upload guide (contains account-specific notes)
+UPLOAD_INSTRUCTIONS.txt
+
+# Release build output (assets are uploaded to the GitHub release, not committed)
+dist/
+
+# PyInstaller build output (the standalone exe is a release asset, not committed)
+pyi_dist/
+pyi_build/
+
+# Local release staging (attached to GitHub Releases, not committed)
+release/
