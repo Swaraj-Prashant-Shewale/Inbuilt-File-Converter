@@ -13,6 +13,12 @@ All notable changes to Quick Convert are documented here.
   conversion. Clicking "Show in folder" or adding more files cancels it.
 - Self-test (`--selftest`) now covers presentation -> PDF and slide images.
 
+### Security
+
+- Word and PowerPoint are now driven with macros force-disabled
+  (`AutomationSecurity`), so converting an untrusted .docm/.pptm cannot run
+  its macros.
+
 ### Changed
 
 - Both installers now install LibreOffice unless it is already present or

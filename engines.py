@@ -475,6 +475,9 @@ def _office_pdf_word(src):
             word = win32.DispatchEx("Word.Application")
         except Exception:
             raise ConvertError("Microsoft Word is not installed.")
+        # Automation-launched Office enables macros by default; force them
+        # off so converting an untrusted file can never run its code.
+        word.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
         word.Visible = False
         try:
             word.DisplayAlerts = 0
@@ -575,6 +578,8 @@ def _ppt_pdf_powerpoint(src):
             app = win32.DispatchEx("PowerPoint.Application")
         except Exception:
             raise ConvertError("Microsoft PowerPoint is not installed.")
+        # Macros are on by default under automation; force them off.
+        app.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
         try:
             app.DisplayAlerts = 1  # ppAlertsNone
         except Exception:
