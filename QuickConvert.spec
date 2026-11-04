@@ -9,9 +9,10 @@ from PyInstaller.utils.hooks import collect_all
 _pkgs = [
     "PIL", "pillow_heif",           # images
     "pymupdf", "pdf2docx", "docx", "fontTools", "lxml",  # pdf <-> docx
+    "pptx",                         # self-test sample deck
     "py7zr", "pyppmd", "inflate64", "brotli",            # 7z codecs
     "multivolumefile", "texttable", "Cryptodome", "backports.zstd",
-    "win32com",                     # drive Microsoft Word for docx->pdf
+    "win32com",                     # drive Word/PowerPoint for ->pdf
 ]
 
 datas, binaries, hiddenimports = [], [], []

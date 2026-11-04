@@ -2,6 +2,25 @@
 
 All notable changes to Quick Convert are documented here.
 
+## v1.1.0 - 2026-11-04
+
+### Added
+
+- **Presentations** - PPTX, PPT, PPTM, PPSX, PPS and ODP to PDF, or to one
+  PNG/JPG per slide (`name_slide1.png`, ...). Rendered by Microsoft PowerPoint
+  if installed, otherwise LibreOffice headless.
+- The window now closes automatically 5 seconds after an error-free
+  conversion. Clicking "Show in folder" or adding more files cancels it.
+- Self-test (`--selftest`) now covers presentation -> PDF and slide images.
+
+### Changed
+
+- Both installers now install LibreOffice unless it is already present or
+  both Microsoft Word and PowerPoint are installed.
+- The source installer now also installs `python-pptx` and `pywin32`
+  (pywin32 was previously missing, so Word/PowerPoint export was unavailable
+  in the source edition).
+
 ## v1.0.0 - 2026-08-13
 
 First public release. A WinRAR-style right-click file converter for Windows

@@ -6,9 +6,9 @@
 # .\build_exe.ps1 first for a full release. dist\ is git-ignored; the zips are
 # uploaded to the GitHub release, not committed.
 #
-# Usage:  .\make_release.ps1              # version 1.0.0
+# Usage:  .\make_release.ps1              # version 1.1.0
 #         .\make_release.ps1 -Version 1.1.0
-param([string]$Version = "1.0.0")
+param([string]$Version = "1.1.0")
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot

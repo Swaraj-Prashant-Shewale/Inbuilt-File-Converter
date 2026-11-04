@@ -20,6 +20,7 @@ folder offers compression (zip / 7z / tar.gz).
 | Video | mp4, mkv, mov, avi, webm, wmv, flv, m4v, mpg, ts, 3gp | mp4, mkv, mov, avi, webm, gif + audio extraction |
 | Audio | mp3, wav, flac, aac, ogg, m4a, wma, opus, aiff | mp3, wav, flac, m4a, ogg, opus, aac |
 | Documents | docx, md, html, odt, rtf, epub, txt, tex | docx, pdf, md, html, odt, rtf, epub, txt |
+| Presentations | pptx, ppt, pptm, ppsx, pps, odp | pdf, png/jpg (per slide) |
 | PDF | pdf | docx, txt, png/jpg (per page) |
 | Archives | zip, 7z, tar, tar.gz/tgz, tar.bz2, tar.xz, gz | extract, or repack/compress to zip, 7z, tar.gz |
 
@@ -69,6 +70,8 @@ QuickConvert.exe --install --classic-menu   # standalone edition
 - **Pillow / pillow-heif** - images
 - **Microsoft Word or LibreOffice** - DOCX/ODT/RTF -> PDF at full fidelity
   (Word is used if installed, otherwise LibreOffice headless)
+- **Microsoft PowerPoint or LibreOffice** - presentations -> PDF / slide
+  images (one of the two is required)
 - **Pandoc** - document format conversions (docx/md/html/odt/rtf/epub/txt);
   Markdown/HTML -> PDF renders through Edge headless
 - **pdf2docx / PyMuPDF** - PDF to docx/text/images

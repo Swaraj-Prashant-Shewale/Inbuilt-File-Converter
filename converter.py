@@ -22,12 +22,13 @@ import traceback
 import engines
 import register
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 PORT = 47653          # fixed port for single-instance handoff
 MAGIC = "QUICKCONVERTv1"      # first line of a valid handoff
 ACK = b"QC-OK"                # primary's reply confirming it processed the paths
 CONN_TIMEOUT = 3.0    # per-connection socket timeout (accepted socks are blocking)
+AUTO_CLOSE_SECONDS = 5  # window closes this long after an error-free run
 
 
 def _dpi_aware():
@@ -206,6 +207,7 @@ class App:
     # ------------------------------------------------------------- layout
 
     def rebuild(self):
+        self._cancel_auto_close()  # new files arrived: stay open for them
         prev = self.choice_var.get()
         names = [os.path.basename(p) for p in self.paths]
         shown = ", ".join(names[:3]) + (f"  (+{len(names) - 3} more)"
@@ -384,8 +386,28 @@ class App:
         else:
             self.button.config(text="Close", command=self.root.destroy)
         self.button.state(["!disabled"])
+        if not errors:
+            self._auto_close(AUTO_CLOSE_SECONDS, self.status.cget("text"))
+
+    def _auto_close(self, left, done_text):
+        """Count down in the status line, then close the window."""
+        if left <= 0:
+            self.root.destroy()
+            return
+        self.status.config(text=f"{done_text}  Closing in {left}s...")
+        self._close_job = self.root.after(
+            1000, lambda: self._auto_close(left - 1, done_text))
+
+    def _cancel_auto_close(self):
+        job = getattr(self, "_close_job", None)
+        if job is not None:
+            self.root.after_cancel(job)
+            self._close_job = None
+            self.status.config(
+                text=self.status.cget("text").split("  Closing in")[0])
 
     def reveal(self):
+        self._cancel_auto_close()
         subprocess.Popen(["explorer", "/select,", self.outputs[0]])
 
     def on_close(self):

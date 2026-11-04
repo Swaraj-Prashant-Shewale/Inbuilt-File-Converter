@@ -26,6 +26,7 @@ AUDIO_EXTS = {"mp3", "wav", "flac", "aac", "ogg", "oga", "m4a", "wma", "opus",
               "aiff", "aif"}
 DOC_EXTS = {"docx", "md", "markdown", "html", "htm", "odt", "rtf", "epub",
             "txt", "tex"}
+PRESENTATION_EXTS = {"pptx", "ppt", "pptm", "ppsx", "pps", "odp"}
 # Compound extensions must be checked before the bare single-suffix ones.
 COMPOUND_EXTS = ("tar.gz", "tar.bz2", "tar.xz")
 ARCHIVE_EXTS = {"zip", "7z", "tar", "gz", "tgz", "bz2", "xz", "tar.gz",
@@ -83,6 +84,8 @@ def family_of(path):
         return "pdf"
     if ext in DOC_EXTS:
         return "document"
+    if ext in PRESENTATION_EXTS:
+        return "presentation"
     if ext in ARCHIVE_EXTS:
         return "archive"
     return "other"
@@ -105,6 +108,8 @@ FAMILY_TARGETS = {
                  ("EPUB", "epub"), ("TXT", "txt")],
     "pdf": [("DOCX", "docx"), ("TXT", "txt"), ("PNG (pages)", "png"),
             ("JPG (pages)", "jpg")],
+    "presentation": [("PDF", "pdf"), ("PNG (slides)", "png"),
+                     ("JPG (slides)", "jpg")],
 }
 
 COMPRESS_TARGETS = [("ZIP", "zip"), ("7Z", "7z"), ("TAR.GZ", "tar.gz")]
@@ -501,7 +506,7 @@ def _office_pdf_word(src):
         pythoncom.CoUninitialize()
 
 
-def _office_pdf_soffice(src):
+def _office_pdf_soffice(src, pdf_filter="writer_pdf_Export"):
     """Export through LibreOffice headless (high fidelity, no MS Office needed)."""
     soffice = _bundled("soffice.exe") or _find_tool("soffice", (
         r"C:\Program Files\LibreOffice\program\soffice.exe",
@@ -514,7 +519,7 @@ def _office_pdf_soffice(src):
         # A private profile dir lets us convert even if LibreOffice is open.
         prof = (Path(outdir) / "profile").as_uri()
         _run([soffice, "-env:UserInstallation=" + prof, "--headless",
-              "--norestore", "--convert-to", "pdf:writer_pdf_Export",
+              "--norestore", "--convert-to", "pdf:" + pdf_filter,
               "--outdir", outdir, str(src)], "LibreOffice")
         produced = Path(outdir) / (Path(src).stem + ".pdf")
         if not produced.exists():
@@ -551,6 +556,89 @@ def _doc_to_pdf_pandoc(src):
         if not Path(dst).exists():
             raise ConvertError("Edge did not produce a PDF.")
     return [str(dst)]
+
+
+# ---------------------------------------------------------------- presentations
+
+def _ppt_pdf_powerpoint(src):
+    """Export through Microsoft PowerPoint (best fidelity) if installed."""
+    try:
+        import pythoncom
+        import win32com.client as win32
+    except ImportError:
+        raise ConvertError("PowerPoint automation unavailable (pywin32 missing).")
+    dst = unique_path(Path(src).with_suffix(".pdf"))
+    pythoncom.CoInitialize()
+    app = pres = None
+    try:
+        try:
+            app = win32.DispatchEx("PowerPoint.Application")
+        except Exception:
+            raise ConvertError("Microsoft PowerPoint is not installed.")
+        try:
+            app.DisplayAlerts = 1  # ppAlertsNone
+        except Exception:
+            pass
+        # PowerPoint refuses Visible=False on the app; open windowless instead.
+        pres = app.Presentations.Open(str(src), ReadOnly=True,
+                                      Untitled=False, WithWindow=False)
+        pres.SaveAs(str(dst), 32)  # 32 = ppSaveAsPDF
+        if not Path(dst).exists():
+            raise ConvertError("PowerPoint produced no PDF.")
+        return [str(dst)]
+    except ConvertError:
+        Path(dst).unlink(missing_ok=True)
+        raise
+    except Exception as e:
+        Path(dst).unlink(missing_ok=True)
+        raise ConvertError(f"PowerPoint export failed: {e}")
+    finally:
+        try:
+            if pres is not None:
+                pres.Close()
+        except Exception:
+            pass
+        try:
+            if app is not None:
+                app.Quit()
+        except Exception:
+            pass
+        pythoncom.CoUninitialize()
+
+
+def _presentation_to_pdf(src):
+    errors = []
+    for engine in (_ppt_pdf_powerpoint,
+                   lambda s: _office_pdf_soffice(s, "impress_pdf_Export")):
+        try:
+            return engine(src)
+        except ConvertError as e:
+            errors.append(str(e).splitlines()[0])
+    raise ConvertError("Presentation conversion needs Microsoft PowerPoint or "
+                       "LibreOffice.\n" + "\n".join(errors) +
+                       "\nInstall LibreOffice with: "
+                       "winget install TheDocumentFoundation.LibreOffice")
+
+
+def convert_presentation(src, dst_ext):
+    """pptx/ppt/odp -> PDF, or -> one PNG/JPG per slide (via a temp PDF)."""
+    src = os.path.abspath(src)
+    if dst_ext == "pdf":
+        return _presentation_to_pdf(src)
+    pdf = _presentation_to_pdf(src)[0]
+    try:
+        outputs = convert_pdf(pdf, dst_ext)
+    finally:
+        Path(pdf).unlink(missing_ok=True)
+    # Rename name_pN -> name_slideN, which reads better for decks.
+    renamed = []
+    for out in outputs:
+        p = Path(out)
+        num = p.stem.rpartition("_p")[2]
+        target = unique_path(p.with_name(f"{Path(src).stem}_slide{num}{p.suffix}"))
+        p.rename(target)
+        renamed.append(str(target))
+    return renamed
 
 
 # ---------------------------------------------------------------- pdf
@@ -745,6 +833,8 @@ def convert_one(path, target_ext, quality=85):
         return convert_doc(path, target_ext)
     if fam == "pdf":
         return convert_pdf(path, target_ext)
+    if fam == "presentation":
+        return convert_presentation(path, target_ext)
     if fam == "archive":
         return repack_archive(path, target_ext)
     raise ConvertError(f"No converter for {Path(path).name}")
@@ -793,6 +883,19 @@ def run_selftest():
         trial("docx: ->pdf (Word/LibreOffice)", lambda: convert_doc(dpath, "pdf"))
     except Exception as e:
         results.append(("docx: ->pdf", "FAIL", f"{e.__class__.__name__}: {e}"))
+    try:
+        from pptx import Presentation
+        ppath = os.path.join(tmp, "t.pptx")
+        _p = Presentation()
+        _s = _p.slides.add_slide(_p.slide_layouts[0])
+        _s.shapes.title.text = "Quick Convert self-test"
+        _p.save(ppath)
+        trial("pptx: ->pdf (PowerPoint/LibreOffice)",
+              lambda: convert_presentation(ppath, "pdf"))
+        trial("pptx: ->png (slides)",
+              lambda: convert_presentation(ppath, "png"))
+    except Exception as e:
+        results.append(("pptx: ->pdf", "FAIL", f"{e.__class__.__name__}: {e}"))
     trial("archive: ->zip", lambda: make_archive([png], "zip"))
     trial("archive: ->7z (py7zr)", lambda: make_archive([png], "7z"))
     trial("archive: ->tar.gz", lambda: make_archive([png], "tar.gz"))
@@ -809,9 +912,9 @@ def run_selftest():
     try:
         import win32com.client  # noqa: F401
         import pythoncom  # noqa: F401
-        results.append(("lib: pywin32 (Word docx->pdf)", "PRESENT", ""))
+        results.append(("lib: pywin32 (Word/PowerPoint ->pdf)", "PRESENT", ""))
     except Exception as e:
-        results.append(("lib: pywin32 (Word docx->pdf)", "MISSING",
+        results.append(("lib: pywin32 (Word/PowerPoint ->pdf)", "MISSING",
                         str(e).splitlines()[0] if str(e) else ""))
 
     shutil.rmtree(tmp, ignore_errors=True)
