@@ -76,9 +76,9 @@ def _publish(src, ext, writer):
 def _write_csv(dst, headers, rows):
     with open(dst, "w", encoding="utf-8-sig", newline="") as f:  # BOM: Excel
         w = csv.writer(f)
-        w.writerow(headers)
+        w.writerow([engines.csv_safe(h) for h in headers])
         for r in rows:
-            w.writerow(["" if v is None else v for v in r])
+            w.writerow(["" if v is None else engines.csv_safe(v) for v in r])
 
 
 def _write_json(dst, data):

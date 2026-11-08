@@ -169,6 +169,14 @@ def targets_for(paths):
 
 # ---------------------------------------------------------------- helpers
 
+def csv_safe(value):
+    """Neutralise CSV formula injection: a cell that Excel would evaluate
+    (leading = + - @ tab CR) is prefixed with a quote so it stays text."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def unique_path(path):
     """A non-colliding path, inserting ' (n)' before the (compound) extension."""
     path = Path(path)

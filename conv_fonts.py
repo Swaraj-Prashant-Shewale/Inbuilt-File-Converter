@@ -22,6 +22,23 @@ def _b128(d, i):
     raise ValueError("bad base128")
 
 
+def _check_woff1(src):
+    """Reject WOFF (zlib) decompression bombs: cap the declared sizes."""
+    with open(src, "rb") as f:
+        head = f.read(44)
+        if len(head) < 44:
+            raise engines.ConvertError("Not a readable font: truncated WOFF")
+        num = int.from_bytes(head[12:14], "big")
+        total = int.from_bytes(head[16:20], "big")  # totalSfntSize
+        dirs = f.read(num * 20)
+    if len(dirs) < num * 20:
+        raise engines.ConvertError("Not a readable font: bad WOFF table directory")
+    orig = sum(int.from_bytes(dirs[i * 20 + 12:i * 20 + 16], "big")
+               for i in range(num))
+    if total > _MAX_SFNT or orig > _MAX_SFNT:
+        raise engines.ConvertError("Font too large to convert safely")
+
+
 def _check_woff2(src):
     """Reject WOFF2 decompression bombs before fontTools inflates them."""
     import brotli
@@ -71,13 +88,20 @@ def _convert_font(src, target):
     except ImportError:
         raise engines.ConvertError(
             "fontTools not installed. Run: pip install --user fonttools")
-    if target == "woff2" or src.lower().endswith(".woff2"):
+    with open(src, "rb") as f:
+        magic = f.read(4)
+    if target == "woff2" or magic == b"wOF2":
         try:
             import brotli  # noqa: F401
         except ImportError:
             raise engines.ConvertError(
                 "brotli not installed. Run: pip install --user brotli")
+    # Decide by content, not file name: a renamed WOFF/WOFF2 must not skip
+    # the decompression-bomb checks.
+    if magic == b"wOF2":
         _check_woff2(src)
+    elif magic == b"wOFF":
+        _check_woff1(src)
     dst = None
     font = None
     try:

@@ -32,6 +32,9 @@ All notable changes to Quick Convert are documented here.
 - Word, Excel, PowerPoint and Visio share one automation helper: macros off,
   alerts off, a watchdog for hung (e.g. password-prompting) files, and the
   app process is force-closed if it doesn't exit after Quit.
+- Security: Office automation fails closed if macros can't be disabled;
+  CSV output neutralises formula-looking cells (`=`, `+`, `-`, `@`); WOFF
+  and WOFF2 fonts are size-checked by content, not file name.
 - Installers now require Excel too before skipping LibreOffice, and the
   source installer adds openpyxl, PyYAML, defusedxml, extract-msg, rawpy and
   pillow-jxl-plugin.

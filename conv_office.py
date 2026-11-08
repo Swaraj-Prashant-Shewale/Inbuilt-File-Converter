@@ -124,10 +124,17 @@ def _com_app(progid, label):
             raise engines.ConvertError(f"{label} is not installed.")
         # Automation-launched Office enables macros by default; force them
         # off before opening anything untrusted.
-        try:
-            app.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
-        except Exception:
-            pass
+        # Fail closed: never open an untrusted file with macros possibly on.
+        # Visio has no AutomationSecurity; its opens pass macros-disabled flags.
+        if label != "Visio":
+            try:
+                app.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
+                ok = app.AutomationSecurity == 3
+            except Exception:
+                ok = False
+            if not ok:
+                raise engines.ConvertError(
+                    f"{label}: could not disable macros; refusing to open the file.")
         try:
             # ppAlertsNone is 1 (0 would mean ppAlertsAll); others use 0/False.
             app.DisplayAlerts = 1 if "PowerPoint" in progid else 0
@@ -363,7 +370,8 @@ def _csv_openpyxl(src):
             with open(path, "w", newline="", encoding="utf-8-sig") as f:
                 w = csv.writer(f)
                 for row in ws.iter_rows(values_only=True):
-                    w.writerow(["" if v is None else v for v in row])
+                    w.writerow(["" if v is None else engines.csv_safe(v)
+                                for v in row])
             out.append((ws.title, path))
         return out
     except Exception as e:
