@@ -10,6 +10,9 @@ _pkgs = [
     "PIL", "pillow_heif",           # images
     "pymupdf", "pdf2docx", "docx", "fontTools", "lxml",  # pdf <-> docx
     "pptx",                         # self-test sample deck
+    "rawpy", "pillow_jxl",          # camera RAW, JPEG XL
+    "extract_msg", "olefile", "compressed_rtf", "RTFDE",  # Outlook .msg
+    "openpyxl", "yaml", "defusedxml",                    # spreadsheets / data
     "py7zr", "pyppmd", "inflate64", "brotli",            # 7z codecs
     "multivolumefile", "texttable", "Cryptodome", "backports.zstd",
     "win32com",                     # drive Word/PowerPoint for ->pdf
@@ -28,7 +31,7 @@ for _p in _pkgs:
 # Lazily-imported modules PyInstaller's analysis would otherwise miss.
 hiddenimports += ["fitz", "cv2", "numpy", "fire", "zstandard", "backports.zstd",
                   "win32com.client", "pythoncom", "pywintypes", "win32api",
-                  "win32timezone"]
+                  "win32timezone", "win32process"]
 
 # Trim dev/test-only packages AND the heavy ML/data-science stack that happens
 # to be installed on the build machine - PyInstaller pulls in anything an

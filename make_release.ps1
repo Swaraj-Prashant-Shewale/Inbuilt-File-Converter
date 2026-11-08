@@ -6,9 +6,9 @@
 # .\build_exe.ps1 first for a full release. dist\ is git-ignored; the zips are
 # uploaded to the GitHub release, not committed.
 #
-# Usage:  .\make_release.ps1              # version 1.1.0
+# Usage:  .\make_release.ps1              # version 1.2.0
 #         .\make_release.ps1 -Version 1.1.0
-param([string]$Version = "1.1.0")
+param([string]$Version = "1.2.0")
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
@@ -35,6 +35,8 @@ Get-ChildItem $dist -Filter "QuickConvert-v*.zip" -ErrorAction SilentlyContinue 
 # ---- Edition A: Source (requires Python) ---------------------------------
 $srcFiles = @('converter.py', 'engines.py', 'register.py', 'install.ps1',
               'uninstall.ps1', 'README.md', 'LICENSE', 'CHANGELOG.md')
+# Format plugins (conv_*.py) are imported by engines.py and must ship too.
+$srcFiles += Get-ChildItem $root -Filter 'conv_*.py' | ForEach-Object Name
 foreach ($f in $srcFiles) {
     if (-not (Test-Path (Join-Path $root $f))) { throw "missing file: $f" }
 }

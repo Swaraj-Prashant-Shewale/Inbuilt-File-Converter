@@ -2,6 +2,40 @@
 
 All notable changes to Quick Convert are documented here.
 
+## v1.2.0 - 2026-11-08
+
+### Added
+
+- **Spreadsheets** (xlsx, xls, xlsm, xlsb, ods) -> PDF, PNG/JPG pages, CSV
+  (one file per sheet), XLSX. Uses Excel, otherwise LibreOffice.
+- **Email** (eml, msg) -> PDF or PNG/JPG, or extract the attachments. Remote
+  images and scripts are blocked.
+- **PDF -> split pages**: one PDF per page in a single step.
+- **Old Office upgrades**: doc -> docx/pdf, ppt/pps/odp -> pptx.
+- **Visio** (vsdx, vsd) -> PDF/PNG/JPG.
+- **XPS/OXPS, MOBI, FB2, CBZ, CBR** -> PDF or page images.
+- **SVG** -> PNG/JPG/PDF; **saved web pages** (mhtml) -> PDF/PNG.
+- **Fonts**: TTF/OTF <-> WOFF/WOFF2.
+- **Subtitles**: SRT <-> VTT <-> ASS.
+- **Data**: JSON <-> YAML <-> XML <-> CSV/TSV, any of them -> XLSX.
+- **Contacts** (vcf) and **calendars** (ics) -> CSV/JSON.
+- **Images**: read PSD and camera RAW (CR2, CR3, NEF, ARW, DNG, RAF, ...);
+  read and write JPEG XL.
+- **Video -> PNG frames** (one per second, into a folder).
+- Self-test now covers every new format and fails if any Office process is
+  left running afterwards.
+
+### Changed
+
+- New formats live in `conv_*.py` plugin modules; a broken plugin no longer
+  stops the app from starting (it is reported by `--selftest`).
+- Word, Excel, PowerPoint and Visio share one automation helper: macros off,
+  alerts off, a watchdog for hung (e.g. password-prompting) files, and the
+  app process is force-closed if it doesn't exit after Quit.
+- Installers now require Excel too before skipping LibreOffice, and the
+  source installer adds openpyxl, PyYAML, defusedxml, extract-msg, rawpy and
+  pillow-jxl-plugin.
+
 ## v1.1.0 - 2026-11-04
 
 ### Added

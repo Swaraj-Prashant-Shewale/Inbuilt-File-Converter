@@ -40,7 +40,7 @@ echo   already installed.
 :pandoc_done
 echo.
 
-echo Checking Office engine (DOCX/PPTX to PDF, slide images)...
+echo Checking Office engine (Word/Excel/PowerPoint files to PDF and images)...
 where soffice >nul 2>nul
 if not errorlevel 1 goto lo_ok
 if exist "%ProgramFiles%\LibreOffice\program\soffice.exe" goto lo_ok
@@ -48,19 +48,22 @@ if exist "%ProgramFiles(x86)%\LibreOffice\program\soffice.exe" goto lo_ok
 set "APPS=SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
 set HAVE_WORD=0
 set HAVE_PPT=0
+set HAVE_XL=0
 reg query "HKLM\%APPS%\winword.exe" >nul 2>nul && set HAVE_WORD=1
 reg query "HKCU\%APPS%\winword.exe" >nul 2>nul && set HAVE_WORD=1
 reg query "HKLM\%APPS%\powerpnt.exe" >nul 2>nul && set HAVE_PPT=1
 reg query "HKCU\%APPS%\powerpnt.exe" >nul 2>nul && set HAVE_PPT=1
-if "%HAVE_WORD%%HAVE_PPT%"=="11" goto office_ok
-echo   Word and/or PowerPoint not found - installing LibreOffice...
+reg query "HKLM\%APPS%\excel.exe" >nul 2>nul && set HAVE_XL=1
+reg query "HKCU\%APPS%\excel.exe" >nul 2>nul && set HAVE_XL=1
+if "%HAVE_WORD%%HAVE_PPT%%HAVE_XL%"=="111" goto office_ok
+echo   Word, Excel or PowerPoint not found - installing LibreOffice...
 winget install -e --id TheDocumentFoundation.LibreOffice --silent --accept-package-agreements --accept-source-agreements
 goto office_done
 :lo_ok
 echo   LibreOffice already installed.
 goto office_done
 :office_ok
-echo   Microsoft Word and PowerPoint found - will use them.
+echo   Microsoft Word, Excel and PowerPoint found - will use them.
 :office_done
 echo.
 

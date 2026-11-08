@@ -22,7 +22,7 @@ import traceback
 import engines
 import register
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 PORT = 47653          # fixed port for single-instance handoff
 MAGIC = "QUICKCONVERTv1"      # first line of a valid handoff
