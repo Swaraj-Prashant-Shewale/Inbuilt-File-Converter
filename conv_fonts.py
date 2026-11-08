@@ -1,5 +1,6 @@
 """Font conversion plugin: ttf / otf / woff / woff2 <-> each other (fontTools)."""
 
+import os
 from pathlib import Path
 
 import engines
@@ -23,20 +24,52 @@ def _b128(d, i):
 
 
 def _check_woff1(src):
-    """Reject WOFF (zlib) decompression bombs: cap the declared sizes."""
+    """Reject WOFF (zlib) decompression bombs by actually inflating each
+    table in a bounded, streaming way - declared sizes can't be trusted."""
+    import zlib
+    size = os.path.getsize(src)
     with open(src, "rb") as f:
         head = f.read(44)
         if len(head) < 44:
             raise engines.ConvertError("Not a readable font: truncated WOFF")
         num = int.from_bytes(head[12:14], "big")
-        total = int.from_bytes(head[16:20], "big")  # totalSfntSize
         dirs = f.read(num * 20)
-    if len(dirs) < num * 20:
-        raise engines.ConvertError("Not a readable font: bad WOFF table directory")
-    orig = sum(int.from_bytes(dirs[i * 20 + 12:i * 20 + 16], "big")
-               for i in range(num))
-    if total > _MAX_SFNT or orig > _MAX_SFNT:
-        raise engines.ConvertError("Font too large to convert safely")
+        if len(dirs) < num * 20:
+            raise engines.ConvertError(
+                "Not a readable font: bad WOFF table directory")
+        total = 0
+        for i in range(num):
+            e = dirs[i * 20:(i + 1) * 20]
+            off = int.from_bytes(e[4:8], "big")
+            comp = int.from_bytes(e[8:12], "big")
+            orig = int.from_bytes(e[12:16], "big")
+            if comp > orig or off + comp > size:
+                raise engines.ConvertError(
+                    "Not a readable font: bad WOFF table entry")
+            total += orig
+            if total > _MAX_SFNT:
+                raise engines.ConvertError("Font too large to convert safely")
+            if comp == orig:
+                continue  # stored uncompressed
+            f.seek(off)
+            dec, out, left = zlib.decompressobj(), 0, comp
+            while left > 0:
+                chunk = f.read(min(65536, left))
+                if not chunk:
+                    break
+                left -= len(chunk)
+                try:
+                    # Never inflate more than one byte past the declared size.
+                    out += len(dec.decompress(chunk, orig - out + 1))
+                    while dec.unconsumed_tail and out <= orig:
+                        out += len(dec.decompress(dec.unconsumed_tail,
+                                                  orig - out + 1))
+                except zlib.error:
+                    raise engines.ConvertError(
+                        "Not a readable font: corrupt WOFF data")
+                if out > orig:
+                    raise engines.ConvertError(
+                        "Not a readable font: WOFF data larger than declared")
 
 
 def _check_woff2(src):
