@@ -8,7 +8,11 @@ modified; name clashes become `name (1).ext`).
   <img src="docs/screenshot.png" alt="Quick Convert popup" width="420">
 </p>
 
-Select multiple files to batch-convert them in one window; select images and
+Select several documents (Word, PDF, presentations, spreadsheets, emails,
+images, ...) and choose **Merge into one PDF** - or **Merge into one DOCX**
+for Word/PDF files - to get a single combined file, in the order Explorer
+passes them. The PDF gets a bookmark per source file. Select multiple files to
+batch-convert them in one window; select images and
 choose PDF to optionally combine them into a single document. Right-clicking a
 folder offers compression (zip / 7z / tar.gz).
 

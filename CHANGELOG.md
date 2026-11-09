@@ -2,6 +2,15 @@
 
 All notable changes to Quick Convert are documented here.
 
+## Unreleased
+
+### Added
+
+- **Merge multiple files into one PDF or DOCX.** Select several documents and
+  pick "Merge into one PDF" (any mix of documents, PDFs, presentations,
+  spreadsheets, emails, images) or "Merge into one DOCX" (Word/PDF files).
+  Originals are untouched; the PDF gets one bookmark per source file.
+
 ## v1.2.0 - 2026-11-08
 
 ### Added

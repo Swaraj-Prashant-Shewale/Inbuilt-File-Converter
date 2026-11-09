@@ -309,6 +309,11 @@ class App:
                     except Exception as e:
                         errors.append((p, str(e)))
                     self.uiq.put(("tick", i))
+            elif kind == "merge":
+                outputs = engines.merge_files(
+                    batch, value, quality,
+                    lambda msg, i: self.uiq.put(("status", msg, i)))
+                self.uiq.put(("tick", total))
             elif combine:
                 self.uiq.put(("status", "Building PDF...", 0))
                 outputs = engines.images_to_pdf(batch, quality)

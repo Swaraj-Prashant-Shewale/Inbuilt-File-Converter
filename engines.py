@@ -162,9 +162,32 @@ def targets_for(paths):
                 if ext in (common or set()) and not any(c[1] == ext for c in choices):
                     choices.append(("conv", ext, label))
 
+    choices += [("merge", ext, f"Merge into one {ext.upper()}")
+                for ext in mergeable_targets(paths)]
     for label, ext in COMPRESS_TARGETS:
         choices.append(("compress", ext, label + " (compress)"))
     return choices
+
+
+def mergeable_targets(paths):
+    """Single-file formats the whole selection can be merged into (PDF, DOCX).
+
+    A format qualifies when every file is already that format or has a
+    converter to it. Selections of only images are left to the existing
+    "combine into one PDF" option.
+    """
+    if len(paths) < 2:
+        return []
+    fams = {family_of(p) for p in paths}
+    if fams == {"image"}:
+        return []
+    out = []
+    for ext in ("pdf", "docx"):
+        if all(ext_of(p) == ext or
+               any(e == ext for _, e in FAMILY_TARGETS.get(family_of(p), []))
+               for p in paths):
+            out.append(ext)
+    return out
 
 
 # ---------------------------------------------------------------- helpers
@@ -756,6 +779,129 @@ def convert_pdf(src, dst_ext):
         doc.close()
 
 
+# ---------------------------------------------------------------- merging
+
+def _import_pymupdf():
+    try:
+        import pymupdf
+        return pymupdf
+    except ImportError:
+        try:
+            import fitz  # older PyMuPDF name
+            return fitz
+        except ImportError:
+            raise ConvertError("PyMuPDF not installed. "
+                               "Run: pip install --user pymupdf")
+
+
+def _merge_pdfs(parts, names, dst):
+    fitz = _import_pymupdf()
+    out = fitz.open()
+    toc = []
+    try:
+        for part, name in zip(parts, names):
+            try:
+                src = fitz.open(part)
+            except Exception:
+                raise ConvertError(f"Could not read {name}.")
+            try:
+                if src.needs_pass:
+                    raise ConvertError(f"{name} is password-protected.")
+                if src.page_count:
+                    toc.append([1, name, out.page_count + 1])  # bookmark
+                    out.insert_pdf(src)
+            finally:
+                src.close()
+        if not out.page_count:
+            raise ConvertError("Nothing to merge: no pages found.")
+        out.set_toc(toc)
+        out.save(str(dst), garbage=3, deflate=True)
+    finally:
+        out.close()
+
+
+def _merge_docx_word(parts, dst):
+    import conv_office  # shared COM lifecycle: macros off, no leaked process
+
+    def work(app):
+        doc = app.Documents.Add()
+        try:
+            sel = app.Selection
+            for i, part in enumerate(parts):
+                if i:
+                    sel.InsertBreak(2)  # wdSectionBreakNextPage
+                sel.EndKey(6)           # wdStory: append at the very end
+                sel.InsertFile(str(part), "", False, False, False)
+            doc.SaveAs2(str(dst), 16)   # 16 = wdFormatXMLDocument
+        finally:
+            conv_office._close(doc, False)
+
+    conv_office._com_run("Word.Application", "Word", work)
+    if not Path(dst).exists():
+        raise ConvertError("Word produced no document.")
+
+
+def _merge_docx(parts, dst):
+    """Word keeps each file's own page setup; pandoc is the no-Word fallback."""
+    try:
+        _merge_docx_word(parts, dst)
+        return
+    except ConvertError as word_err:
+        Path(dst).unlink(missing_ok=True)
+        try:
+            pd = _pandoc()
+        except ConvertError:
+            raise word_err
+    _run_producing([pd] + [str(p) for p in parts] + ["-o", str(dst)],
+                   "Pandoc", dst)
+
+
+def merge_files(paths, target, quality=85, progress=None):
+    """Merge several files into ONE `target` (pdf or docx), in the order given.
+
+    Each input is converted to the target format next to its source, merged,
+    and the temporary conversions are deleted again. Inputs already in the
+    target format are used as they are and never modified.
+    """
+    paths = [os.path.abspath(p) for p in paths]
+    if target not in ("pdf", "docx"):
+        raise ConvertError(f"Can't merge into .{target}")
+    total = len(paths)
+    temps, parts = [], []
+    dst = None
+    try:
+        for i, p in enumerate(paths, 1):
+            name = Path(p).name
+            if progress:
+                progress(f"Preparing {name}  ({i}/{total})...", i - 1)
+            if ext_of(p) == target:
+                parts.append(p)
+                continue
+            try:
+                outs = convert_one(p, target, quality)
+            except ConvertError as e:
+                raise ConvertError(f"{name}:\n{e}")
+            temps += outs
+            parts.append(outs[0])
+        if progress:
+            progress("Merging into one file...", total)
+        first = Path(paths[0])
+        dst = unique_path(first.with_name(
+            f"{_split_name(first)[0]} - merged.{target}"))
+        if target == "pdf":
+            _merge_pdfs(parts, [_split_name(p)[0] for p in paths], dst)
+        else:
+            _merge_docx(parts, dst)
+    except Exception:
+        if dst is not None:
+            Path(dst).unlink(missing_ok=True)
+        raise
+    finally:
+        for t in temps:
+            Path(t).unlink(missing_ok=True)
+    return [str(dst)]
+
+
 # ---------------------------------------------------------------- archives
 
 def _unique_arcname(name, used):
@@ -988,6 +1134,18 @@ def run_selftest():
     except Exception as e:
         results.append(("video: frames", "FAIL",
                         f"{e.__class__.__name__}: {str(e).splitlines()[0]}"))
+    try:
+        mdocs = []
+        for n in ("m1", "m2"):
+            mp = os.path.join(tmp, n + ".docx")
+            _d = Document()
+            _d.add_paragraph(f"merge test {n}")
+            _d.save(mp)
+            mdocs.append(mp)
+        trial("merge: 2 docx -> one pdf", lambda: merge_files(mdocs, "pdf"))
+        trial("merge: 2 docx -> one docx", lambda: merge_files(mdocs, "docx"))
+    except Exception as e:
+        results.append(("merge", "FAIL", f"{e.__class__.__name__}: {e}"))
     trial("archive: ->zip", lambda: make_archive([png], "zip"))
     trial("archive: ->7z (py7zr)", lambda: make_archive([png], "7z"))
     trial("archive: ->tar.gz", lambda: make_archive([png], "tar.gz"))
